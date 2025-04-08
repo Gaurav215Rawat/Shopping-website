@@ -4,7 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 require('dotenv').config();
-
+const https = require('https');
+const http = require('http');
 
 
 const pool = require('./config/dbconfig');
@@ -30,19 +31,11 @@ createTables();
 
 
 
-const httpsPort = process.env.HTTPS_PORT || 3443; // HTTPS port
 const httpPort = process.env.HTTP_PORT || 3000; // HTTP port
 
-// Create HTTPS server
-const httpsServer = https.createServer(sslOptions, app);
 
 // Create HTTP server
 const httpServer = http.createServer(app);
-
-// Start HTTPS server
-httpsServer.listen(httpsPort, () => {
-  console.log(`HTTPS Server is running on port ${httpsPort}`);
-});
 
 // Start HTTP server
 httpServer.listen(httpPort, () => {
@@ -92,12 +85,12 @@ app.use('/login', login);
   
 
 //category
-const categoryRoutes = require('./routes/categories');
+const categoryRoutes = require('./routes/products/categories');
 app.use('/categories', categoryRoutes);
 
 
 //uploaded images
-const productImageRoutes = require('./routes/productImages');
+const productImageRoutes = require('./routes/products/productImages');
 app.use('/product-images', productImageRoutes);
 
 // Also serve uploaded images
