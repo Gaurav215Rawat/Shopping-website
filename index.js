@@ -87,6 +87,9 @@ app.use('/login', login);
 const address = require('./routes/user/addresses');
 app.use('/address', address);
 
+//contact us
+const contactus = require('./routes/Infosite/contact');
+app.use('/contactus', contactus);
 
 //category
 const categoryRoutes = require('./routes/products/categories');
