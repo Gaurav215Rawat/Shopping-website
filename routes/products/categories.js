@@ -75,16 +75,16 @@ router.get('/v2', async (req, res) => {
   
     try {
       if (tree === 'true') {
-        const all = await pool.query(`SELECT * FROM categories WHERE is_deleted = false ORDER BY id`);
+        const all = await pool.query(`SELECT * FROM categories ORDER BY id`);
         const treeData = buildCategoryTree(all.rows);
         return res.json({ total: all.rowCount, categories: treeData });
       }
   
       const result = await pool.query(
-        `SELECT * FROM categories WHERE is_deleted = false ORDER BY id LIMIT $1 OFFSET $2`,
+        `SELECT * FROM categories WHERE BY id LIMIT $1 OFFSET $2`,
         [limit, offset]
       );
-      const total = await pool.query(`SELECT COUNT(*) FROM categories WHERE is_deleted = false`);
+      const total = await pool.query(`SELECT COUNT(*) FROM categories`);
   
       res.json({
         total: parseInt(total.rows[0].count),

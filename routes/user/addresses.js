@@ -5,7 +5,7 @@ const { pool } = require('../../config/dbconfig'); // update path if needed
 
 
 // Add new address
-router.post('/add', async (req, res) => {
+router.post('/', async (req, res) => {
   const { user_id, address_line, city, state, country, postal_code, is_default } = req.body;
 
 // Check for required fields
@@ -36,7 +36,7 @@ if (!user_id || !address_line || !city || !state || !country || !postal_code) {
     });
   } catch (err) {
     console.error('Error adding address:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message:err.detail });
   }
 });
 
@@ -69,7 +69,7 @@ router.put('/edit/:id', async (req, res) => {
     res.json({ message: 'Address updated', address: result.rows[0] });
   } catch (err) {
     console.error('Error updating address:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message:err.detail });
   }
 });
 
@@ -92,7 +92,7 @@ router.delete('/delete/:id', async (req, res) => {
     res.json({ message: 'Address deleted successfully' });
   } catch (err) {
     console.error('Error deleting address:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message:err.detail });
   }
 });
 
@@ -109,7 +109,7 @@ router.get('/user/:user_id', async (req, res) => {
     res.json({ addresses: result.rows });
   } catch (err) {
     console.error('Error fetching addresses:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message:err.detail });
   }
 });
 

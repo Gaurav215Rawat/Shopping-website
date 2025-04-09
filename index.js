@@ -83,11 +83,18 @@ app.post('/verify-token', (req, res) => {
 const login = require('./routes/user/login');
 app.use('/login', login);
   
+//Address
+const address = require('./routes/user/addresses');
+app.use('/address', address);
+
 
 //category
 const categoryRoutes = require('./routes/products/categories');
 app.use('/categories', categoryRoutes);
 
+// product
+const productRoutes = require('./routes/products/product');
+app.use('/product', productRoutes);
 
 //uploaded images
 const productImageRoutes = require('./routes/products/productImages');

@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const otpLimiter = require('../../middleware/ratelimit');
 const { pool } = require('../../config/dbconfig');
 const sendMail = require('../../config/mailconfig');
+const { error } = require('console');
 
 // Generate 6-digit OTP
 const generateOTP = () => crypto.randomInt(100000, 999999).toString();
@@ -34,7 +35,7 @@ router.post('/signup', async (req, res) => {
     res.status(201).json({ message: 'User created', user: newUser.rows[0] });
   } catch (err) {
     console.error('Signup error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error',message:err.detail });
   } finally {
     client.release();
   }
@@ -89,7 +90,7 @@ router.post('/request-otp', otpLimiter, async (req, res) => {
     const expiresAt = new Date(now.getTime() + 5 * 60000); // expires in 5 mins
 
     await client.query(
-      `UPDATE users SET otp_code = $1, otp_expires_at = $2, otp_attempts = 0 WHERE email = $3`,
+      `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE email = $3`,
       [otp, expiresAt, email]
     );
 
@@ -124,9 +125,6 @@ router.post('/verify-otp', async (req, res) => {
     const now = new Date();
     const expiresAt = new Date(user.otp_expires_at);
 
-    if (user.otp_attempts >= 5) {
-      return res.status(403).json({ error: 'Too many incorrect attempts. Please request a new OTP.' });
-    }
 
     if (!user.otp_code || now > expiresAt) {
       return res.status(400).json({ error: 'OTP expired. Please request a new one.' });
@@ -134,7 +132,7 @@ router.post('/verify-otp', async (req, res) => {
 
     if (user.otp_code === otp) {
       await client.query(
-        `UPDATE users SET otp_code = NULL, otp_expires_at = NULL, otp_attempts = 0 WHERE email = $1`,
+        `UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE email = $1`,
         [email]
       );
 
@@ -152,11 +150,8 @@ router.post('/verify-otp', async (req, res) => {
           role: user.role
         }
       });
-    } else {
-      await client.query(
-        `UPDATE users SET otp_attempts = otp_attempts + 1 WHERE email = $1`,
-        [email]
-      );
+    } 
+    else {
       return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
     }
   } catch (err) {

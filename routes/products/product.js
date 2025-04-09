@@ -91,7 +91,7 @@ router.get('/products', async (req, res) => {
       res.status(201).json({ message: 'Product created', product: result.rows[0] });
     } catch (err) {
       console.error('Error creating product:', err);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error',message:err.detail });
     } finally {
       client.release();
     }
@@ -121,7 +121,7 @@ router.get('/products', async (req, res) => {
       res.json(result.rows[0]);
     } catch (err) {
       console.error('Error fetching product:', err);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error',message:err.detail });
     } finally {
       client.release();
     }
@@ -159,7 +159,7 @@ router.get('/products', async (req, res) => {
       res.json({ message: 'Product updated', product: result.rows[0] });
     } catch (err) {
       console.error('Error updating product:', err);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error',message:err.detail });
     } finally {
       client.release();
     }
@@ -186,7 +186,7 @@ router.get('/products', async (req, res) => {
       res.json({ message: 'Product deleted', deleted: result.rows[0] });
     } catch (err) {
       console.error('Error deleting product:', err);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error',message:err.detail });
     } finally {
       client.release();
     }
