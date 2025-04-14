@@ -58,15 +58,17 @@ const createTables = async () => {
         
         CREATE TABLE IF NOT EXISTS carts (
           id SERIAL PRIMARY KEY,
-          user_id INT REFERENCES users(id),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          user_id INT REFERENCES users(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id) -- Ensures one cart per user
         );
-        
+
         CREATE TABLE IF NOT EXISTS cart_items (
           id SERIAL PRIMARY KEY,
-          cart_id INT REFERENCES carts(id),
+          cart_id INT REFERENCES carts(id) ON DELETE CASCADE,
           product_id INT REFERENCES products(id),
-          quantity INT
+          quantity INT DEFAULT 1,
+          UNIQUE(cart_id, product_id) -- Ensures one entry per product in a cart
         );
         
         CREATE TABLE IF NOT EXISTS wishlists (
@@ -124,6 +126,16 @@ const createTables = async () => {
           shipping_status VARCHAR(50),
           estimated_delivery DATE,
           tracking_number VARCHAR(100)
+        );
+
+
+        CREATE TABLE IF NOT EXISTS job_listings (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          location VARCHAR(255) NOT NULL,
+          job_type VARCHAR(50),
+          skills TEXT,
+          experience VARCHAR(50)
         );
         
         `;

@@ -137,16 +137,14 @@ router.post('/verify-otp', async (req, res) => {
       );
 
       const payload = { id: user.id, email: user.email };
-      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
       return res.json({
         message: 'OTP verified. Logged in successfully.',
         token,
         user: {
           id: user.id,
-          name: user.name,
           email: user.email,
-          phone: user.phone,
           role: user.role
         }
       });

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../../config/dbconfig');
+const authenticateToken =require('../../middleware/jwt')
+const authorizeRoles = require('../../middleware/authorizeRole');
 
 
 // utils/buildCategoryTree.js
@@ -24,7 +26,7 @@ const buildCategoryTree = (categories, parentId = null) => {
   
 
 // CREATE category
-router.post('/', async (req, res) => {
+router.post('/',authenticateToken , authorizeRoles('admin'), async (req, res) => {
   const { name, parent_id } = req.body;
 
   try {
@@ -99,7 +101,7 @@ router.get('/v2', async (req, res) => {
   });
 
 // UPDATE category
-router.put('/:id', async (req, res) => {
+router.put('/:id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
   const { id } = req.params;
   const { name, parent_id } = req.body;
 
@@ -124,7 +126,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE category
-router.delete('/:id', async (req, res) => {
+router.delete('/:id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
   const { id } = req.params;
 
   try {

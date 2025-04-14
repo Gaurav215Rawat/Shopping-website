@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../../config/dbconfig'); // update path if needed
-
+const { userExists } = require('../../Checks/user');
 
 
 // Add new address
@@ -14,12 +14,11 @@ if (!user_id || !address_line || !city || !state || !country || !postal_code) {
   }
 
   try {
-    // Verify if the user exists
-    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [user_id]);
-
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
+      
+    // User Exist or Not
+      if (!(await userExists(user_id))) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
     // Insert new address
     const result = await pool.query(
@@ -48,10 +47,9 @@ router.put('/edit/:id', async (req, res) => {
   const { user_id,address_line, city, state, country, postal_code, is_default } = req.body;
 
   try {
-    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [user_id]);
-
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found.' });
+    // User Exist or Not
+    if (!(await userExists(user_id))) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
     const result = await pool.query(

@@ -105,3 +105,10 @@ app.use('/product-images', productImageRoutes);
 
 // Also serve uploaded images
 app.use('/uploads', express.static('uploads'));
+
+
+
+
+// Main website
+const listing = require('./routes/Infosite/joblisting');
+app.use('/listing', listing);

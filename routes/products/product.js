@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../../config/dbconfig');
-
+const authenticateToken =require('../../middleware/jwt')
+const authorizeRoles = require('../../middleware/authorizeRole');
 
 // with Filters & Search
 router.get('/products', async (req, res) => {
@@ -68,7 +69,7 @@ router.get('/products', async (req, res) => {
 
 
   // Add a Product
-  router.post('/', async (req, res) => {
+  router.post('/',authenticateToken , authorizeRoles('admin'), async (req, res) => {
     const client = await pool.connect();
     try {
       const { name, description, price, stock, category_id } = req.body;
@@ -130,7 +131,7 @@ router.get('/products', async (req, res) => {
   
 
   // Update Product
-  router.put('/products/:id', async (req, res) => {
+  router.put('/products/:id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
     const client = await pool.connect();
     try {
       const { id } = req.params;
@@ -169,7 +170,7 @@ router.get('/products', async (req, res) => {
 
   // Delete Product
 
-  router.delete('/products/:id', async (req, res) => {
+  router.delete('/products/:id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
     const client = await pool.connect();
     try {
       const { id } = req.params;

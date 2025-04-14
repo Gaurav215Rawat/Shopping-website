@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../../middleware/upload');
 const { pool } = require('../../config/dbconfig'); // Adjust this to your actual DB pool
+const authenticateToken =require('../../middleware/jwt')
+const authorizeRoles = require('../../middleware/authorizeRole');
 const fs = require('fs');
 const path = require('path');
 
 
 // Upload single or multiple images for a product
-router.post('/upload/:product_id', upload.array('images', 6), async (req, res) => {
+router.post('/upload/:product_id', upload.array('images', 6),authenticateToken , authorizeRoles('admin'), async (req, res) => {
   const client = await pool.connect();
   try {
     const { product_id } = req.params;
@@ -65,7 +67,7 @@ router.get('/:product_id', async (req, res) => {
 
  // Delete a specific image by ID
   
-router.delete('/:image_id', async (req, res) => {
+router.delete('/:image_id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
     const client = await pool.connect();
     try {
       const { image_id } = req.params;
@@ -103,7 +105,7 @@ router.delete('/:image_id', async (req, res) => {
 
     //  Delete all images of a product
 
-    router.delete('/all/:product_id', async (req, res) => {
+    router.delete('/all/:product_id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
         const client = await pool.connect();
         try {
           const { product_id } = req.params;
