@@ -128,14 +128,14 @@ const createTables = async () => {
           tracking_number VARCHAR(100)
         );
 
-
         CREATE TABLE IF NOT EXISTS job_listings (
           id SERIAL PRIMARY KEY,
           title VARCHAR(255) NOT NULL,
           location VARCHAR(255) NOT NULL,
           job_type VARCHAR(50),
           skills TEXT,
-          experience VARCHAR(50)
+          experience VARCHAR(50),
+          UNIQUE(title, location,job_type,skills,experience)
         );
         
         `;
