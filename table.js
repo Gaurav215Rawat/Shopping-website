@@ -1,6 +1,10 @@
 // === File: Table.js ===
 const { pool } = require('./config/dbconfig'); 
 
+
+//DROP TABLE IF EXISTS entries CASCADE;
+
+
 const createTables = async () => {
     const client = await pool.connect();
     try {
@@ -136,6 +140,16 @@ const createTables = async () => {
           skills TEXT,
           experience VARCHAR(50),
           UNIQUE(title, location,job_type,skills,experience)
+        );
+        
+        CREATE TABLE IF NOT EXISTS blogs (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255) UNIQUE,  
+          content TEXT,
+          category VARCHAR(100),
+          author VARCHAR(100),
+          external_link TEXT UNIQUE,  
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         
         `;

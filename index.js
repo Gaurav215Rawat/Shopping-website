@@ -112,3 +112,6 @@ app.use('/uploads', express.static('uploads'));
 // Main website
 const listing = require('./routes/Infosite/joblisting');
 app.use('/listing', listing);
+
+const blogs = require('./routes/Infosite/blogs');
+app.use('/blogs', blogs);
