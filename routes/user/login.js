@@ -6,7 +6,9 @@ const otpLimiter = require('../../middleware/ratelimit');
 const { pool } = require('../../config/dbconfig');
 const sendMail = require('../../config/mailconfig');
 const { error } = require('console');
-const bcrypt = require('bcryptjs')
+const bcrypt = require('bcryptjs');
+const authenticateToken = require('../../middleware/jwt');
+const authorizeRoles = require('../../middleware/authorizeRole');
 
 
 // Generate 6-digit OTP
@@ -187,5 +189,62 @@ router.post('/get-otp', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate OTP' });
   }
 });
+
+
+router.get('/user',authenticateToken,authorizeRoles('Admin') ,async (req, res) => {
+  const client = await pool.connect();
+  try {
+    let { name, role, page = 1, limit = 10 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    let filters = [];
+    let values = [];
+
+    // Filter by name (first or last)
+    if (name) {
+      filters.push(`(name ILIKE $${values.length + 1})`);
+      values.push(`%${name}%`);
+    }
+
+    // Filter by role
+    if (role) {
+      filters.push(`role ILIKE $${values.length + 1}`);
+      values.push(`%${role}%`);
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+
+    const dataQuery = `
+      SELECT * FROM users
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+    `;
+    values.push(limit, offset);
+
+    const countQuery = `SELECT COUNT(*) FROM users ${whereClause}`;
+
+    const [dataResult, countResult] = await Promise.all([
+      client.query(dataQuery, values),
+      client.query(countQuery, values.slice(0, values.length - 2))
+    ]);
+
+    res.json({
+      users: dataResult.rows,
+      total: parseInt(countResult.rows[0].count),
+      page,
+      limit
+    });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
+
 
 module.exports = router;
