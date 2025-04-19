@@ -164,12 +164,19 @@ router.post('/verify-otp', async (req, res) => {
 
 //------------------------------// POST /generate-otp-----------------
 // POST /generate-otp
-router.get('/get-otp', async (req, res) => {
+router.post('/get-otp', async (req, res) => {
   try {
     const otp = generateOTP(); 
+    const {email} = req.body;
     const saltRounds = 10;
 
     const hashedOTP = await bcrypt.hash(otp, saltRounds);
+
+    await sendMail(
+      email,
+      'Your OTP Code',
+      `<p>Your OTP code is <b>${otp}</b>. It will expire in 5 minutes.</p>`
+    );
 
     res.status(200).json({
       message: 'OTP generated ',
