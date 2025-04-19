@@ -58,7 +58,7 @@ router.post("/mail-verify", async (req, res) => {
     const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found. Please check the email entered.' });
+      return res.status(404).json({ error: "It looks like you don't have an account yet. Please sign up to get started." });
     }
 
     return res.status(200).json({ message: 'User found. You can proceed to login.' });
