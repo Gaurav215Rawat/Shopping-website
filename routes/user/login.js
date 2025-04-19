@@ -6,6 +6,8 @@ const otpLimiter = require('../../middleware/ratelimit');
 const { pool } = require('../../config/dbconfig');
 const sendMail = require('../../config/mailconfig');
 const { error } = require('console');
+const bcrypt = require('bcryptjs')
+
 
 // Generate 6-digit OTP
 const generateOTP = () => crypto.randomInt(100000, 999999).toString();
@@ -136,7 +138,7 @@ router.post('/verify-otp', async (req, res) => {
         [email]
       );
 
-      const payload = { id: user.id, email: user.email };
+      const payload = { id: user.id, email: user.email, role: user.role };
       const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
       return res.json({
@@ -157,6 +159,25 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ error: 'Internal server error', message: err.message });
   } finally {
     client.release();
+  }
+});
+
+//------------------------------// POST /generate-otp-----------------
+// POST /generate-otp
+router.get('/get-otp', async (req, res) => {
+  try {
+    const otp = generateOTP(); 
+    const saltRounds = 10;
+
+    const hashedOTP = await bcrypt.hash(otp, saltRounds);
+
+    res.status(200).json({
+      message: 'OTP generated ',
+      hashedOTP: hashedOTP
+    });
+  } catch (err) {
+    console.error('Error generating OTP:', err);
+    res.status(500).json({ error: 'Failed to generate OTP' });
   }
 });
 

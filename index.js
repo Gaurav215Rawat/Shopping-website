@@ -106,7 +106,21 @@ app.use('/product-images', productImageRoutes);
 // Also serve uploaded images
 app.use('/uploads', express.static('uploads'));
 
+// carts & items
+const cart = require('./routes/cart/carts');
+app.use('/cart', cart);
 
+//wishlist
+const wishlistRouter = require('./routes/cart/wishlist');
+app.use('/wishlist', wishlistRouter);
+
+//order
+const ordersRouter = require('./routes/orders/orders');
+app.use('/orders', ordersRouter);
+
+// Payment 
+const paymentRoutes = require('./routes/orders/payment');
+app.use('/api/payments', paymentRoutes);
 
 
 // Main website
@@ -115,3 +129,4 @@ app.use('/listing', listing);
 
 const blogs = require('./routes/Infosite/blogs');
 app.use('/blogs', blogs);
+

@@ -46,9 +46,12 @@ const createTables = async () => {
         CREATE TABLE IF NOT EXISTS products (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255),
-          description TEXT,
+          short_description TEXT,
+          main_description TEXT,
           price NUMERIC(10,2),
+          discount_price NUMERIC(10,2),
           stock INTEGER,
+          specifications JSONB,
           category_id INT REFERENCES categories(id) ON DELETE SET NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE (name, category_id)
@@ -77,32 +80,35 @@ const createTables = async () => {
         
         CREATE TABLE IF NOT EXISTS wishlists (
           id SERIAL PRIMARY KEY,
-          user_id INT REFERENCES users(id),
+          user_id INT REFERENCES users(id) ON DELETE CASCADE,
           product_id INT REFERENCES products(id)
         );
         
         CREATE TABLE IF NOT EXISTS orders (
           id SERIAL PRIMARY KEY,
-          user_id INT REFERENCES users(id),
-          address_id INT REFERENCES addresses(id),
-          status VARCHAR(20) DEFAULT 'pending',
-          total NUMERIC(10,2),
+          user_id INT REFERENCES users(id) ON DELETE CASCADE,
+          address_id INT REFERENCES addresses(id) ON DELETE SET NULL,
+          status VARCHAR(20) DEFAULT 'pending', -- pending, paid, failed, cancelled
+          total NUMERIC(10,2) NOT NULL,
+          razorpay_order_id VARCHAR(100), -- Razorpay's order_id
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         
         CREATE TABLE IF NOT EXISTS order_items (
           id SERIAL PRIMARY KEY,
-          order_id INT REFERENCES orders(id),
-          product_id INT REFERENCES products(id),
-          quantity INT,
-          price NUMERIC(10,2)
+          order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+          product_id INT REFERENCES products(id) ON DELETE SET NULL,
+          quantity INT NOT NULL,
+          price NUMERIC(10,2) NOT NULL
         );
         
         CREATE TABLE IF NOT EXISTS payments (
           id SERIAL PRIMARY KEY,
-          order_id INT REFERENCES orders(id),
-          payment_method VARCHAR(50),
-          payment_status VARCHAR(20),
+          order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+          payment_method VARCHAR(50) DEFAULT 'razorpay',
+          razorpay_payment_id VARCHAR(100), -- Razorpay's payment_id
+          razorpay_signature TEXT,          -- For verification
+          payment_status VARCHAR(20) DEFAULT 'pending', -- pending, success, failed
           payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         
@@ -143,15 +149,41 @@ const createTables = async () => {
         );
         
         CREATE TABLE IF NOT EXISTS blogs (
-          id SERIAL PRIMARY KEY,
-          title VARCHAR(255) UNIQUE,  
-          content TEXT,
-          category VARCHAR(100),
-          author VARCHAR(100),
-          external_link TEXT UNIQUE,  
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        url_reference VARCHAR(255) UNIQUE,
+        summary TEXT,
+        content TEXT NOT NULL,
+        category VARCHAR(100),
+        tags TEXT[],  -- array of tags
+        author VARCHAR(100),
+        thumbnail_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        estimated_read_time VARCHAR(20),
+        likes INTEGER DEFAULT 0
+      );
+
+      -- Table: blog_comments
+      CREATE TABLE IF NOT EXISTS blog_comments (
+        id SERIAL PRIMARY KEY,
+        blog_id INTEGER REFERENCES blogs(id) ON DELETE CASCADE,
+        username VARCHAR(100) NOT NULL,
+        comment TEXT NOT NULL,
+        likes INTEGER DEFAULT 0,
+        posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS likes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('blog', 'comment')),
+        target_id INTEGER NOT NULL,
+        liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_id, target_type, target_id)
+      );
+
+              
         `;
 
     await client.query(createTablesQuery);

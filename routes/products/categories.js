@@ -26,7 +26,7 @@ const buildCategoryTree = (categories, parentId = null) => {
   
 
 // CREATE category
-router.post('/',authenticateToken , authorizeRoles('admin'), async (req, res) => {
+router.post('/',authenticateToken , authorizeRoles('Admin'), async (req, res) => {
   const { name, parent_id } = req.body;
 
   try {
@@ -101,7 +101,7 @@ router.get('/v2', async (req, res) => {
   });
 
 // UPDATE category
-router.put('/:id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
+router.put('/:id',authenticateToken , authorizeRoles('Admin'), async (req, res) => {
   const { id } = req.params;
   const { name, parent_id } = req.body;
 
@@ -126,7 +126,7 @@ router.put('/:id',authenticateToken , authorizeRoles('admin'), async (req, res) 
 });
 
 // DELETE category
-router.delete('/:id',authenticateToken , authorizeRoles('admin'), async (req, res) => {
+router.delete('/:id',authenticateToken , authorizeRoles('Admin'), async (req, res) => {
   const { id } = req.params;
 
   try {
