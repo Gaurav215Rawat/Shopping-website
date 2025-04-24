@@ -310,6 +310,97 @@ router.get('/user' ,async (req, res) => {
   }
 });
 
+router.post('/add_user',authenticateToken,authorizeRoles, async (req, res) => {
+  const { name, email, phone, gender, role = 'customer' } = req.body; // Default to 'customer' if not provided
 
+  const client = await pool.connect();
+  try {
+    // Check if email or phone is already registered
+    const existing = await client.query(
+      'SELECT * FROM users WHERE email = $1 OR phone = $2',
+      [email, phone]
+    );
 
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Email or phone already registered' });
+    }
+
+    // Insert new user with the specified role
+    const newUser = await client.query(
+      `INSERT INTO users (name, email, phone, gender, role)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, email, phone, gender, role`,
+      [name, email, phone, gender, role]
+    );
+
+    res.status(201).json({ message: 'User created', user: newUser.rows[0] });
+  } catch (err) {
+    console.error('Signup error:', err);
+    res.status(500).json({ error: 'Server error', message: err.detail });
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/users/:id', authenticateToken, authorizeRoles('Admin'), async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, gender, role } = req.body;
+
+  const client = await pool.connect();
+  try {
+    // Check if email or phone already exists, excluding the current user
+    const existing = await client.query(
+      'SELECT * FROM users WHERE (email = $1 OR phone = $2) AND id != $3',
+      [email, phone, id]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Email or phone already registered' });
+    }
+
+    // Update user information
+    const updatedUser = await client.query(
+      `UPDATE users
+       SET name = $1, email = $2, phone = $3, gender = $4, role = $5
+       WHERE id = $6
+       RETURNING id, name, email, phone, gender, role`,
+      [name, email, phone, gender, role, id]
+    );
+
+    if (updatedUser.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User updated successfully', user: updatedUser.rows[0] });
+  } catch (err) {
+    console.error('Update error:', err);
+    res.status(500).json({ error: 'Server error', message: err.detail });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete('/users/:id', authenticateToken, authorizeRoles('Admin'), async (req, res) => {
+  const { id } = req.params;
+
+  const client = await pool.connect();
+  try {
+    // Delete the user by ID
+    const deletedUser = await client.query(
+      'DELETE FROM users WHERE id = $1 RETURNING *',
+      [id]
+    );
+
+    if (deletedUser.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully', deletedUser: deletedUser.rows[0] });
+  } catch (err) {
+    console.error('Delete error:', err);
+    res.status(500).json({ error: 'Server error', message: err.detail });
+  } finally {
+    client.release();
+  }
+});
 module.exports = router;

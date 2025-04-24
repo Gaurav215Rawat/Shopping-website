@@ -256,4 +256,85 @@ router.put('/products/:id', authenticateToken, authorizeRoles('Admin'), async (r
   });
   
 
+  router.delete('/products/v2/:id', authenticateToken, authorizeRoles('Admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const { id: product_id } = req.params;
+  
+      // Start a transaction
+      await client.query('BEGIN');
+  
+      // Fetch all image URLs for the given product
+      const { rows: imageRows } = await client.query(
+        'SELECT image_url FROM product_images WHERE product_id = $1',
+        [product_id]
+      );
+  
+      // Delete all product images from DB
+      await client.query('DELETE FROM product_images WHERE product_id = $1', [product_id]);
+  
+      // Delete the product itself
+      const result = await client.query(
+        'DELETE FROM products WHERE id = $1 RETURNING *',
+        [product_id]
+      );
+  
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: 'Product not found' });
+      }
+  
+      // Commit DB transaction
+      await client.query('COMMIT');
+  
+      // Track the directory of the images
+      let folderPath = null;
+  
+      // Delete image files from disk
+      await Promise.all(imageRows.map(async (row) => {
+        let relPath = row.image_url;
+  
+        if (relPath.startsWith('/')) {
+          relPath = relPath.slice(1);
+        }
+  
+        const imagePath = path.resolve(__dirname, '..', '..', relPath);
+  
+        const imageFolderPath = path.dirname(imagePath);
+        if (!folderPath) folderPath = imageFolderPath;
+  
+        await fs.promises.unlink(imagePath).catch((err) => {
+          console.warn('Error deleting image file:', err.message);
+        });
+      }));
+  
+      // Delete folder if it's empty
+      if (folderPath) {
+        fs.readdir(folderPath, (err, files) => {
+          if (err) {
+            console.warn('Error reading folder:', err.message);
+          } else if (files.length === 0) {
+            fs.rm(folderPath, { recursive: true }, (err) => {
+              if (err) {
+                console.warn('Error deleting folder:', err.message);
+              } else {
+                console.log('Folder deleted successfully:', folderPath);
+              }
+            });
+          } else {
+            console.log('Folder not empty, skipping delete:', folderPath);
+          }
+        });
+      }
+  
+      res.json({ message: 'Product and all associated images deleted successfully', deleted: result.rows[0] });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('Error deleting product and images:', err);
+      res.status(500).json({ error: 'Internal server error', message: err.detail });
+    } finally {
+      client.release();
+    }
+  });
+
   module.exports = router;
