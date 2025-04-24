@@ -190,8 +190,73 @@ router.post('/get-otp', async (req, res) => {
   }
 });
 
-
-router.get('/user',authenticateToken,authorizeRoles('Admin') ,async (req, res) => {
+/**
+ * @swagger
+ * /login/user:
+ *   get:
+ *     summary: Get a paginated list of users
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Filter by user name (first or last)
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         description: Filter by user role
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of records per page
+ *     responses:
+ *       200:
+ *         description: A list of users with pagination info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                 total:
+ *                   type: integer
+ *                   example: 100
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 10
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/user' ,async (req, res) => {
   const client = await pool.connect();
   try {
     let { name, role, page = 1, limit = 10 } = req.query;

@@ -6,7 +6,8 @@ const crypto = require('crypto');
 require('dotenv').config();
 const https = require('https');
 const http = require('http');
-
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger'); // adjust path
 
 const pool = require('./config/dbconfig');
 const createTables = require('./table');
@@ -17,7 +18,7 @@ const app = express();
 
 
 
-
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 
 app.use(cors());

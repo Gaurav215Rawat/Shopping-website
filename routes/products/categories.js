@@ -39,7 +39,7 @@ router.post('/',authenticateToken , authorizeRoles('Admin'), async (req, res) =>
     res.status(201).json({ message: 'Category created', category: result.rows[0] });
   } catch (err) {
     console.error('Error creating category:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error',message: err.detail });
   }
 });
 
