@@ -310,7 +310,7 @@ router.get('/user' ,async (req, res) => {
   }
 });
 
-router.post('/add_user',authenticateToken,authorizeRoles, async (req, res) => {
+router.post('/add_user',authenticateToken,authorizeRoles("Admin"), async (req, res) => {
   const { name, email, phone, gender, role = 'customer' } = req.body; // Default to 'customer' if not provided
 
   const client = await pool.connect();
