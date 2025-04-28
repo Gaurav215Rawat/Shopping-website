@@ -6,65 +6,83 @@ const authorizeRoles = require('../../middleware/authorizeRole');
 
 // with Filters & Search
 router.get('/products', async (req, res) => {
-    const client = await pool.connect();
-    try {
-      const { name, category_id, min_price, max_price, min_stock, max_stock, page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-  
-      let conditions = [];
-      let values = [];
-  
-      if (name) {
-        values.push(`%${name.toLowerCase()}%`);
-        conditions.push(`LOWER(p.name) LIKE $${values.length}`);
-      }
-  
-      if (category_id) {
-        values.push(category_id);
-        conditions.push(`p.category_id = $${values.length}`);
-      }
-  
-      if (min_price) {
-        values.push(min_price);
-        conditions.push(`p.discount_price >= $${values.length}`);
-      }
-  
-      if (max_price) {
-        values.push(max_price);
-        conditions.push(`p.discount_price <= $${values.length}`);
-      }
-  
-      if (min_stock) {
-        values.push(min_stock);
-        conditions.push(`p.stock >= $${values.length}`);
-      }
-  
-      if (max_stock) {
-        values.push(max_stock);
-        conditions.push(`p.stock <= $${values.length}`);
-      }
-  
-      let whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  
-      values.push(limit, offset);
-      const result = await client.query(
-        `SELECT p.*, c.name AS category_name
-         FROM products p
-         LEFT JOIN categories c ON p.category_id = c.id
-         ${whereClause}
-         ORDER BY p.id DESC
-         LIMIT $${values.length - 1} OFFSET $${values.length}`,
-        values
-      );
-  
-      res.json({ products: result.rows });
-    } catch (err) {
-      console.error('Error filtering products:', err);
-      res.status(500).json({ message: 'Internal server error' });
-    } finally {
-      client.release();
+  const client = await pool.connect();
+  try {
+    const { name, category_id, min_price, max_price, min_stock, max_stock, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let conditions = [];
+    let values = [];
+
+    if (name) {
+      values.push(`%${name.toLowerCase()}%`);
+      conditions.push(`LOWER(p.name) LIKE $${values.length}`);
     }
-  });
+
+    if (category_id) {
+      values.push(category_id);
+      conditions.push(`p.category_id = $${values.length}`);
+    }
+
+    if (min_price) {
+      values.push(min_price);
+      conditions.push(`p.discount_price >= $${values.length}`);
+    }
+
+    if (max_price) {
+      values.push(max_price);
+      conditions.push(`p.discount_price <= $${values.length}`);
+    }
+
+    if (min_stock) {
+      values.push(min_stock);
+      conditions.push(`p.stock >= $${values.length}`);
+    }
+
+    if (max_stock) {
+      values.push(max_stock);
+      conditions.push(`p.stock <= $${values.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // First, get total products count
+    const countResult = await client.query(
+      `SELECT COUNT(*) AS total FROM products p
+       ${whereClause}`,
+      values
+    );
+    const totalProducts = parseInt(countResult.rows[0].total, 10);
+
+    // Now, fetch paginated product data
+    values.push(limit, offset);
+    const productResult = await client.query(
+      `SELECT p.id, p.name, c.name AS category_name, 
+              p.price, p.discount_price, p.stock,
+              COALESCE(AVG(r.rating), 0) AS average_rating
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN reviews r ON p.id = r.product_id
+       ${whereClause}
+       GROUP BY p.id, c.name
+       ORDER BY p.id DESC
+       LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values
+    );
+
+    res.json({ 
+      totalProducts,
+      productsLeft: totalProducts - page * limit > 0 ? totalProducts - page * limit : 0,
+      products: productResult.rows 
+    });
+  } catch (err) {
+    console.error('Error filtering products:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
   
 
 
