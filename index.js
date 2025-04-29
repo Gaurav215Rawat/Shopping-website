@@ -8,6 +8,7 @@ const https = require('https');
 const http = require('http');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger'); // adjust path
+const fs = require('fs');
 
 const pool = require('./config/dbconfig');
 const createTables = require('./table');
@@ -31,9 +32,15 @@ createTables();
 
 
 
+// // SSL certificate paths
+// const options = {
+//   key: fs.readFileSync('/etc/letsencrypt/live/info.catchcraft.shop/privkey.pem'),
+//   cert: fs.readFileSync('/etc/letsencrypt/live/info.catchcraft.shop/fullchain.pem')
+// };
+
 
 const httpPort = process.env.HTTP_PORT || 3000; // HTTP port
-
+// const httpsPort = process.env.HTTPS_PORT || 3443;
 
 // Create HTTP server
 const httpServer = http.createServer(app);
@@ -44,6 +51,10 @@ httpServer.listen(httpPort, () => {
 });
 
 
+// // Start HTTPS server
+// https.createServer(options, app).listen(httpsPort, () => {
+//   console.log('Backend running on HTTPS port 3002');
+// });
 
 
 

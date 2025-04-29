@@ -70,10 +70,39 @@ router.get('/products', async (req, res) => {
       values
     );
 
+    const products = productResult.rows;
+
+    // ✅ Now get all images related to the fetched products
+    const productIds = products.map(p => p.id);
+    let imagesMap = {};
+
+    if (productIds.length > 0) {
+      const imageResult = await client.query(
+        `SELECT product_id, image_url 
+         FROM product_images 
+         WHERE product_id = ANY($1::int[])`,
+        [productIds]
+      );
+
+      imagesMap = imageResult.rows.reduce((acc, row) => {
+        if (!acc[row.product_id]) {
+          acc[row.product_id] = [];
+        }
+        acc[row.product_id].push(row.image_url);
+        return acc;
+      }, {});
+    }
+
+    // ✅ Attach images array to each product
+    const productsWithImages = products.map(product => ({
+      ...product,
+      images: imagesMap[product.id] || []
+    }));
+
     res.json({ 
       totalProducts,
       productsLeft: totalProducts - page * limit > 0 ? totalProducts - page * limit : 0,
-      products: productResult.rows 
+      products: productsWithImages
     });
   } catch (err) {
     console.error('Error filtering products:', err);
@@ -82,6 +111,7 @@ router.get('/products', async (req, res) => {
     client.release();
   }
 });
+
 
   
 
