@@ -25,14 +25,17 @@ const createTables = async () => {
         CREATE TABLE IF NOT EXISTS addresses (
           id SERIAL PRIMARY KEY,
           user_id INT REFERENCES users(id) ON DELETE CASCADE,
+          full_name VARCHAR(150),
+          phone_no VARCHAR(20),
           address_line TEXT,
           city VARCHAR(100),
           state VARCHAR(100),
           country VARCHAR(100),
           postal_code VARCHAR(20),
           is_default BOOLEAN DEFAULT false,
-          UNIQUE(user_id, address_line, city, state, country, postal_code)
+          UNIQUE(user_id, full_name, phone_no, address_line, city, state, country, postal_code)
         );
+
         
         CREATE TABLE IF NOT EXISTS categories (
           id SERIAL PRIMARY KEY,
@@ -48,8 +51,8 @@ const createTables = async () => {
           name VARCHAR(255),
           short_description TEXT,
           main_description TEXT,
-          price NUMERIC(10,2),
-          discount_price NUMERIC(10,2),
+          price NUMERIC(10,2) CHECK (price >= 0),
+          discount_price NUMERIC(10,2) CHECK (discount_price >= 0),
           stock INTEGER,
           specifications JSONB,
           category_id INT REFERENCES categories(id) ON DELETE SET NULL,
@@ -85,32 +88,39 @@ const createTables = async () => {
         );
         
         CREATE TABLE IF NOT EXISTS orders (
-          id SERIAL PRIMARY KEY,
-          user_id INT REFERENCES users(id) ON DELETE CASCADE,
-          address_id INT REFERENCES addresses(id) ON DELETE SET NULL,
-          status VARCHAR(20) DEFAULT 'pending', -- pending, paid, failed, cancelled
-          total NUMERIC(10,2) NOT NULL,
-          razorpay_order_id VARCHAR(100), -- Razorpay's order_id
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id SERIAL PRIMARY KEY,
+            user_id INT REFERENCES   users(id) ON DELETE CASCADE,
+            address_id INT REFERENCES addresses(id) ON DELETE SET NULL,
+            status VARCHAR(20) CHECK (status IN ('initiated','pending', 'paid', 'failed', 'cancelled', 'processing', 'completed', 'refunded')) DEFAULT 'pending',
+            total NUMERIC(10,2) NOT NULL,
+            payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('phonepe', 'cod')),
+            phonepe_order_id VARCHAR(255) UNIQUE,  -- PhonePe's order_id
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        
+
         CREATE TABLE IF NOT EXISTS order_items (
-          id SERIAL PRIMARY KEY,
-          order_id INT REFERENCES orders(id) ON DELETE CASCADE,
-          product_id INT REFERENCES products(id) ON DELETE SET NULL,
-          quantity INT NOT NULL,
-          price NUMERIC(10,2) NOT NULL
+            id SERIAL PRIMARY KEY,
+            order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+            product_id INT REFERENCES products(id) ON DELETE SET NULL,
+            quantity INT NOT NULL,
+            price NUMERIC(10,2) NOT NULL
         );
         
         CREATE TABLE IF NOT EXISTS payments (
           id SERIAL PRIMARY KEY,
           order_id INT REFERENCES orders(id) ON DELETE CASCADE,
-          payment_method VARCHAR(50) DEFAULT 'razorpay',
-          razorpay_payment_id VARCHAR(100), -- Razorpay's payment_id
-          razorpay_signature TEXT,          -- For verification
-          payment_status VARCHAR(20) DEFAULT 'pending', -- pending, success, failed
-          payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+          user_id INT REFERENCES users(id) ON DELETE CASCADE,
+          payment_method VARCHAR(50) CHECK (payment_method IN ('phonepe', 'credit_card', 'paypal', 'wallet', 'debit_card')) DEFAULT 'phonepe',
+          phonepe_payment_id VARCHAR(100),      -- PhonePe payment_id
+          phonepe_signature TEXT,               -- For verification
+          payment_status VARCHAR(20) CHECK (payment_status IN ('pending', 'success', 'failed', 'initiated', 'refunded')) DEFAULT 'pending',
+          payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          transaction_id VARCHAR(100),          -- Unique transaction ID from PhonePe
+          refund_status VARCHAR(20) DEFAULT 'not_refunded',  -- Handle refunds
+          payment_details JSONB,                -- Storing additional payment details returned from PhonePe
+          payment_mode VARCHAR(50) CHECK (payment_mode IN ('upi', 'debit_card', 'credit_card', 'wallet', 'net_banking')) DEFAULT 'upi',  -- Track payment method
+          payment_response JSONB                -- Store detailed payment response (JSON format)
+      );
         
         CREATE TABLE IF NOT EXISTS reviews (
           id SERIAL PRIMARY KEY,
@@ -170,7 +180,7 @@ const createTables = async () => {
         blog_id INTEGER REFERENCES blogs(id) ON DELETE CASCADE,
         username VARCHAR(100) NOT NULL,
         comment TEXT NOT NULL,
-        likes INTEGER DEFAULT 0,
+        likes INTEGER CHECK (rating BETWEEN 1 AND 5) DEFAULT 0 ,
         posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 

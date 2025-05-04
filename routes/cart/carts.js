@@ -98,14 +98,33 @@ router.get('/items', authenticateToken, async (req, res) => {
   
       // Get items in the user's cart
       const result = await client.query(
-        `SELECT ci.*, p.name AS product_name
-         FROM cart_items ci
-         JOIN products p ON ci.product_id = p.id
-         WHERE ci.cart_id = $1`,
-        [cartId]
-      );
+        ` SELECT 
+        ci.*, 
+        p.name AS product_name,
+        p.discount_price,
+        c.name AS category_name,
+        (
+          SELECT image_url 
+          FROM product_images pi 
+          WHERE pi.product_id = p.id 
+          LIMIT 1
+        ) AS image_url
+      FROM cart_items ci
+      JOIN products p ON ci.product_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE ci.cart_id = $1
+      `,
+      [cartId]
+    );
   
-      res.json({ cart_id: cartId, items: result.rows });
+    const items = result.rows;
+    const total_products = items.reduce((sum, item) => sum + item.quantity, 0);
+    
+    res.json({
+      cart_id: cartId,
+      total_products,
+      items
+    });
     } catch (err) {
       console.error('Error fetching cart items:', err);
       res.status(500).json({ error: 'Internal Server Error', message: err.detail });
@@ -118,55 +137,64 @@ router.get('/items', authenticateToken, async (req, res) => {
   
 // ✅ POST: Add item to cart
 router.post('/items', authenticateToken, async (req, res) => {
-    const { user_id, product_id, quantity } = req.body;
-    const client = await pool.connect();
-  
-    try {
-      // Check if user exists
-      const userCheck = await client.query(
-        'SELECT id FROM users WHERE id = $1',
-        [user_id]
-      );
-      if (userCheck.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-  
-      // Check if cart exists for user
-      const cartCheck = await client.query(
-        'SELECT id FROM carts WHERE user_id = $1',
-        [user_id]
-      );
-      if (cartCheck.rows.length === 0) {
-        return res.status(404).json({ error: "Cart not found for the user" });
-      }
-  
-      const { id: cart_id } = cartCheck.rows[0];
-  
-      // Check if item already exists
-      const existing = await client.query(
-        'SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2',
+  const { user_id, product_id, quantity } = req.body;
+  const client = await pool.connect();
+
+  try {
+    // Check if user exists
+    const userCheck = await client.query(
+      'SELECT id FROM users WHERE id = $1',
+      [user_id]
+    );
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if cart exists for user
+    const cartCheck = await client.query(
+      'SELECT id FROM carts WHERE user_id = $1',
+      [user_id]
+    );
+    if (cartCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Cart not found for the user" });
+    }
+
+    const { id: cart_id } = cartCheck.rows[0];
+
+    // Check if item already exists
+    const existing = await client.query(
+      'SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2',
+      [cart_id, product_id]
+    );
+
+    if (existing.rows.length > 0) {
+      // Increase quantity by 1
+      const updated = await client.query(
+        `UPDATE cart_items
+         SET quantity = quantity + 1
+         WHERE cart_id = $1 AND product_id = $2
+         RETURNING *`,
         [cart_id, product_id]
       );
-  
-      if (existing.rows.length > 0) {
-        return res.status(400).json({ error: "Product already exists in cart. Use PUT to update quantity." });
-      }
-  
-      // Insert new item
-      const insert = await client.query(
-        `INSERT INTO cart_items (cart_id, product_id, quantity) 
-         VALUES ($1, $2, $3) RETURNING *`,
-        [cart_id, product_id, quantity || 1]
-      );
-  
-      res.status(201).json({ message: 'Product added to cart', item: insert.rows[0] });
-    } catch (err) {
-      console.error('Error adding item to cart:', err);
-      res.status(500).json({ error: 'Internal Server Error', message: err.detail });
-    } finally {
-      client.release();
+      return res.status(200).json({ message: "Product quantity increased", item: updated.rows[0] });
     }
-  });
+
+    // Insert new item
+    const insert = await client.query(
+      `INSERT INTO cart_items (cart_id, product_id, quantity) 
+       VALUES ($1, $2, $3) RETURNING *`,
+      [cart_id, product_id, quantity || 1]
+    );
+
+    res.status(201).json({ message: 'Product added to cart', item: insert.rows[0] });
+  } catch (err) {
+    console.error('Error adding item to cart:', err);
+    res.status(500).json({ error: 'Internal Server Error', message: err.detail });
+  } finally {
+    client.release();
+  }
+});
+
   
   
   

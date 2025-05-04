@@ -14,7 +14,7 @@ const authorizeRoles = require('../../middleware/authorizeRole');
 // Generate 6-digit OTP
 const generateOTP = () => crypto.randomInt(100000, 999999).toString();
 
-// ---------------------- SIGNUP ----------------------
+// ---------------------- SIGNUP ----------------------cart creation
 router.post('/signup', async (req, res) => {
   const { name, email, phone, gender } = req.body;
 
@@ -29,6 +29,7 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ message: 'Email or phone already registered' });
     }
 
+    // Create user
     const newUser = await client.query(
       `INSERT INTO users (name, email, phone, gender)
        VALUES ($1, $2, $3, $4)
@@ -36,14 +37,35 @@ router.post('/signup', async (req, res) => {
       [name, email, phone, gender]
     );
 
-    res.status(201).json({ message: 'User created', user: newUser.rows[0] });
+    const user = newUser.rows[0];
+
+    // Create cart for the user
+    await client.query(
+      `INSERT INTO carts (user_id) VALUES ($1)`,
+      [user.id]
+    );
+
+    const payload = { id: user.id, email: user.email, role: user.role };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    return res.json({
+      message: 'OTP verified. Logged in successfully.',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      }
+    });
   } catch (err) {
     console.error('Signup error:', err);
-    res.status(500).json({ error: 'Server error',message:err.detail });
+    res.status(500).json({ error: 'Server error', message: err.detail });
   } finally {
     client.release();
   }
 });
+
+
 
 // ---------------------- EMAIL CHECK ----------------------
 router.post("/mail-verify", async (req, res) => {
@@ -310,6 +332,8 @@ router.get('/user' ,async (req, res) => {
   }
 });
 
+
+// add user and cart creation
 router.post('/add_user',authenticateToken,authorizeRoles("Admin"), async (req, res) => {
   const { name, email, phone, gender, role = 'customer' } = req.body; // Default to 'customer' if not provided
 
@@ -332,8 +356,15 @@ router.post('/add_user',authenticateToken,authorizeRoles("Admin"), async (req, r
        RETURNING id, name, email, phone, gender, role`,
       [name, email, phone, gender, role]
     );
+    const userId = newUser.rows[0].id;
 
-    res.status(201).json({ message: 'User created', user: newUser.rows[0] });
+    // Create cart for the user
+    await client.query(
+      `INSERT INTO carts (user_id) VALUES ($1)`,
+      [userId]
+    );
+
+    res.status(201).json({ message: 'User and cart created', user: newUser.rows[0] });
   } catch (err) {
     console.error('Signup error:', err);
     res.status(500).json({ error: 'Server error', message: err.detail });

@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const authenticateToken = require('../../middleware/jwt');
 const { pool } = require('../../config/dbconfig');
-const { userExists } = require('../../Checks/user');
+
 
 /**
  * @swagger
@@ -39,24 +40,36 @@ const { userExists } = require('../../Checks/user');
  *       404:
  *         description: User not found
  */
-router.post('/', async (req, res) => {
-  const { user_id, address_line, city, state, country, postal_code, is_default } = req.body;
+router.post('/',authenticateToken, async (req, res) => {
+  const { user_id, full_name, phone_no, address_line, city, state, country, postal_code, is_default } = req.body;
 
   if (!user_id || !address_line || !city || !state || !country || !postal_code) {
     return res.status(400).json({ message: 'All fields are required.' });
   }
 
   try {
-    if (!(await userExists(user_id))) {
-      return res.status(404).json({ error: 'User not found' });
+    if (!user_id || !full_name || !phone_no || !address_line || !city || !state || !country || !postal_code) {
+      return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    // Check if this address already exists for the user
+    const existing = await pool.query(
+      `SELECT id FROM addresses 
+       WHERE user_id = $1 AND full_name = $2 AND phone_no = $3 AND address_line = $4 
+         AND city = $5 AND state = $6 AND country = $7 AND postal_code = $8`,
+      [user_id, full_name, phone_no, address_line, city, state, country, postal_code]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: 'Address already exists.' });
     }
 
     const result = await pool.query(
       `INSERT INTO addresses 
-        (user_id, address_line, city, state, country, postal_code, is_default)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+        (user_id, full_name, phone_no, address_line, city, state, country, postal_code, is_default)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [user_id, address_line, city, state, country, postal_code, is_default ?? false]
+      [user_id, full_name, phone_no, address_line, city, state, country, postal_code, is_default ?? false]
     );
 
     res.status(201).json({
@@ -101,21 +114,23 @@ router.post('/', async (req, res) => {
  *       404:
  *         description: Address or user not found
  */
-router.put('/edit/:id', async (req, res) => {
+router.put('/edit/:id',authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { user_id, address_line, city, state, country, postal_code, is_default } = req.body;
+  const { user_id, full_name, phone_no, address_line, city, state, country, postal_code } = req.body;
 
   try {
-    if (!(await userExists(user_id))) {
-      return res.status(404).json({ error: 'User not found' });
+    // Check if user exists
+    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [user_id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
     }
 
     const result = await pool.query(
       `UPDATE addresses
-       SET address_line = $1, city = $2, state = $3, country = $4, postal_code = $5, is_default = $6
-       WHERE id = $7 AND user_id = $8
+       SET full_name = $1, phone_no = $2, address_line = $3, city = $4, state = $5,
+           country = $6, postal_code = $7 WHERE id = $8 AND user_id = $9
        RETURNING *`,
-      [address_line, city, state, country, postal_code, is_default, id, user_id]
+       [full_name, phone_no, address_line, city, state, country, postal_code, id, user_id]
     );
 
     if (result.rows.length === 0) {
@@ -125,6 +140,53 @@ router.put('/edit/:id', async (req, res) => {
     res.json({ message: 'Address updated', address: result.rows[0] });
   } catch (err) {
     console.error('Error updating address:', err);
+    res.status(500).json({ error: 'Internal server error', message: err.detail });
+  }
+});
+
+
+router.put('/default/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { user_id } = req.body;
+
+  try {
+    // Check if user exists
+    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [user_id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Begin transaction
+    await pool.query('BEGIN');
+
+    // Set all user's addresses to is_default = false
+    await pool.query(
+      `UPDATE addresses SET is_default = false WHERE user_id = $1`,
+      [user_id]
+    );
+
+    // Set the specified address to is_default = true
+    const result = await pool.query(
+      `UPDATE addresses
+       SET is_default = true
+       WHERE id = $1 AND user_id = $2
+       RETURNING *`,
+      [id, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(404).json({ message: 'Address not found' });
+    }
+
+    // Commit transaction
+    await pool.query('COMMIT');
+
+    res.json({ message: 'Default address updated', address: result.rows[0] });
+
+  } catch (err) {
+    console.error('Error updating default address:', err);
+    await pool.query('ROLLBACK');
     res.status(500).json({ error: 'Internal server error', message: err.detail });
   }
 });
@@ -146,25 +208,56 @@ router.put('/edit/:id', async (req, res) => {
  *       404:
  *         description: Address not found
  */
-router.delete('/delete/:id', async (req, res) => {
+router.delete('/delete/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      'DELETE FROM addresses WHERE id = $1 RETURNING *',
+    await client.query('BEGIN');
+
+    // 1. Get the address before deletion to check if it's default and get user_id
+    const addressResult = await client.query(
+      'SELECT user_id, is_default FROM addresses WHERE id = $1',
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (addressResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Address not found' });
     }
 
+    const { user_id, is_default } = addressResult.rows[0];
+
+    // 2. Delete the address
+    await client.query('DELETE FROM addresses WHERE id = $1', [id]);
+
+    // 3. If the deleted address was default, set another one as default
+    if (is_default) {
+      const otherAddress = await client.query(
+        'SELECT id FROM addresses WHERE user_id = $1 LIMIT 1',
+        [user_id]
+      );
+
+      if (otherAddress.rows.length > 0) {
+        const newDefaultId = otherAddress.rows[0].id;
+        await client.query(
+          'UPDATE addresses SET is_default = true WHERE id = $1',
+          [newDefaultId]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
     res.json({ message: 'Address deleted successfully' });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Error deleting address:', err);
     res.status(500).json({ error: 'Internal server error', message: err.detail });
+  } finally {
+    client.release();
   }
 });
+
 
 /**
  * @swagger
@@ -182,7 +275,7 @@ router.delete('/delete/:id', async (req, res) => {
  *       200:
  *         description: List of addresses
  */
-router.get('/user/:user_id', async (req, res) => {
+router.get('/user/:user_id',authenticateToken, async (req, res) => {
   const { user_id } = req.params;
 
   try {

@@ -8,7 +8,10 @@ const authorizeRoles = require('../../middleware/authorizeRole');
 router.get('/products', async (req, res) => {
   const client = await pool.connect();
   try {
-    const { name, category_id, min_price, max_price, min_stock, max_stock, page = 1, limit = 10 } = req.query;
+    const {
+      name, category_id, min_price, max_price,
+      min_stock, max_stock, page = 1, limit = 10
+    } = req.query;
     const offset = (page - 1) * limit;
 
     let conditions = [];
@@ -48,8 +51,7 @@ router.get('/products', async (req, res) => {
 
     // First, get total products count
     const countResult = await client.query(
-      `SELECT COUNT(*) AS total FROM products p
-       ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM products p ${whereClause}`,
       values
     );
     const totalProducts = parseInt(countResult.rows[0].total, 10);
@@ -72,13 +74,13 @@ router.get('/products', async (req, res) => {
 
     const products = productResult.rows;
 
-    // ✅ Now get all images related to the fetched products
+    // ✅ Get all images with id & image_url for fetched products
     const productIds = products.map(p => p.id);
     let imagesMap = {};
 
     if (productIds.length > 0) {
       const imageResult = await client.query(
-        `SELECT product_id, image_url 
+        `SELECT id, product_id, image_url 
          FROM product_images 
          WHERE product_id = ANY($1::int[])`,
         [productIds]
@@ -88,7 +90,10 @@ router.get('/products', async (req, res) => {
         if (!acc[row.product_id]) {
           acc[row.product_id] = [];
         }
-        acc[row.product_id].push(row.image_url);
+        acc[row.product_id].push({
+          id: row.id,
+          image_url: row.image_url
+        });
         return acc;
       }, {});
     }
@@ -111,6 +116,7 @@ router.get('/products', async (req, res) => {
     client.release();
   }
 });
+
 
 
   
@@ -270,6 +276,50 @@ router.put('/products/:id', authenticateToken, authorizeRoles('Admin'), async (r
     res.json({ message: 'Product updated', product: result.rows[0] });
   } catch (err) {
     console.error('Error updating product:', err);
+    res.status(500).json({ error: 'Internal server error', message: err.detail });
+  } finally {
+    client.release();
+  }
+});
+
+
+// Update main_description of Product
+router.put('/products/main/:id', authenticateToken, authorizeRoles('Admin'), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { main_description } = req.body;
+
+    // Validate main_description as JSONB type
+    if (typeof main_description !== 'object' || main_description === null || Array.isArray(main_description)) {
+      return res.status(400).json({ message: 'main_description must be a valid JSON object' });
+    }
+
+    // Check if the product exists
+    const checkProduct = await client.query(
+      'SELECT * FROM products WHERE id = $1',
+      [id]
+    );
+
+    if (checkProduct.rows.length <= 0) {
+      return res.status(400).json({ message: 'Product Does Not Exist' });
+    }
+
+    // Update main_description only
+    const result = await client.query(
+      `UPDATE products
+       SET main_description = $1
+       WHERE id = $2 RETURNING *`,
+      [main_description, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json({ message: 'main_description updated', product: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating main_description:', err);
     res.status(500).json({ error: 'Internal server error', message: err.detail });
   } finally {
     client.release();
