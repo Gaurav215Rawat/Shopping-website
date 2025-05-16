@@ -69,9 +69,11 @@ router.get('/', authenticateToken, async (req, res) => {
           p.stock,
           p.specifications,
           p.category_id,
+          c.name AS category_name,
           pi.image_url
         FROM wishlists w
         JOIN products p ON w.product_id = p.id
+        JOIN categories c ON p.category_id = c.id
         LEFT JOIN LATERAL (
           SELECT image_url FROM product_images
           WHERE product_id = p.id
@@ -82,6 +84,7 @@ router.get('/', authenticateToken, async (req, res) => {
         `,
         [user_id]
       );
+
   
       res.json({ wishlist: result.rows });
     } catch (err) {

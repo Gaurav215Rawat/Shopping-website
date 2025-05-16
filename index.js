@@ -33,14 +33,14 @@ createTables();
 
 
 // SSL certificate paths
-const options = {
-  key: fs.readFileSync('/etc/letsencrypt/live/info.catchcraft.shop/privkey.pem'),
-  cert: fs.readFileSync('/etc/letsencrypt/live/info.catchcraft.shop/fullchain.pem')
-};
+// const options = {
+//   key: fs.readFileSync('/etc/letsencrypt/live/info.catchcraft.shop/privkey.pem'),
+//   cert: fs.readFileSync('/etc/letsencrypt/live/info.catchcraft.shop/fullchain.pem')
+// };
 
 
 const httpPort = process.env.HTTP_PORT || 3000; // HTTP port
-const httpsPort = process.env.HTTPS_PORT || 3443;
+// const httpsPort = process.env.HTTPS_PORT || 3443;
 
 // Create HTTP server
 const httpServer = http.createServer(app);
@@ -51,10 +51,10 @@ httpServer.listen(httpPort, () => {
 });
 
 
-// Start HTTPS server
-https.createServer(options, app).listen(httpsPort, () => {
-  console.log(`Backend running on HTTPS port ${httpsPort}`);
-});
+//Start HTTPS server
+// https.createServer(options, app).listen(httpsPort, () => {
+//   console.log(`Backend running on HTTPS port ${httpsPort}`);
+// });
 
 
 
@@ -139,11 +139,24 @@ app.use('/api/payments', paymentRoutes);
 const listing = require('./routes/Infosite/joblisting');
 app.use('/listing', listing);
 
+const comments = require('./routes/Infosite/comment');
+app.use('/comment', comments);
+
+const likes = require('./routes/Infosite/likes');
+app.use('/likes', likes);
+
 const blogs = require('./routes/Infosite/blogs');
 app.use('/blogs', blogs);
+
+
+
 
 
 
 //phone pay Route
 const phonepeRoute = require('./routes/phonepe/phonepeRoute')
 app.use("/api", phonepeRoute);
+
+// Reviews
+const Reviews = require('./routes/reviews/review')
+app.use("/review", Reviews)

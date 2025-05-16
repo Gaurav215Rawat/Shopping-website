@@ -45,18 +45,22 @@ router.post('/signup', async (req, res) => {
       [user.id]
     );
 
-    const payload = { id: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const payload = { id: user.id, email: user.email, role: user.role, name:user.name, gender:user.gender, phone:user.phone};
+      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    return res.json({
-      message: 'OTP verified. Logged in successfully.',
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role
-      }
-    });
+      return res.json({
+        message: 'OTP verified. Logged in successfully.',
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name:user.name,
+          gender:user.gender,
+          phone:user.phone
+        }
+      });
+      
   } catch (err) {
     console.error('Signup error:', err);
     res.status(500).json({ error: 'Server error', message: err.detail });
@@ -93,7 +97,7 @@ router.post("/mail-verify", async (req, res) => {
 });
 
 // ---------------------- REQUEST OTP ----------------------
-router.post('/request-otp', otpLimiter, async (req, res) => {
+router.post('/request-otp', async (req, res) => {
   const { email } = req.body;
 
   const client = await pool.connect();
@@ -108,9 +112,9 @@ router.post('/request-otp', otpLimiter, async (req, res) => {
     const now = new Date();
     const lastExpiry = user.otp_expires_at ? new Date(user.otp_expires_at) : null;
 
-    if (lastExpiry && now.getTime() - lastExpiry.getTime() < 60000) {
-      return res.status(429).json({ error: 'Please wait before requesting a new OTP.' });
-    }
+    // if (lastExpiry && now.getTime() - lastExpiry.getTime() < 60000) {
+    //   return res.status(429).json({ error: 'Please wait before requesting a new OTP.' });
+    // }
 
     const otp = generateOTP();
     const expiresAt = new Date(now.getTime() + 5 * 60000); // expires in 5 mins
@@ -162,7 +166,7 @@ router.post('/verify-otp', async (req, res) => {
         [email]
       );
 
-      const payload = { id: user.id, email: user.email, role: user.role };
+      const payload = { id: user.id, email: user.email, role: user.role, name:user.name, gender:user.gender, phone:user.phone};
       const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
       return res.json({
@@ -171,7 +175,10 @@ router.post('/verify-otp', async (req, res) => {
         user: {
           id: user.id,
           email: user.email,
-          role: user.role
+          role: user.role,
+          name:user.name,
+          gender:user.gender,
+          phone:user.phone
         }
       });
     } 

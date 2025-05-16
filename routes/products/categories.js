@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../../config/dbconfig');
+const path = require('path');
+const fs = require('fs');
+const uploadcatgImage  = require('../../middleware/uploadcatg');
 const authenticateToken =require('../../middleware/jwt')
 const authorizeRoles = require('../../middleware/authorizeRole');
+
 
 
 // utils/buildCategoryTree.js
@@ -25,24 +29,53 @@ const buildCategoryTree = (categories, parentId = null) => {
 
   
 
-// CREATE category
-router.post('/',authenticateToken , authorizeRoles('Admin'), async (req, res) => {
-  const { name, parent_id } = req.body;
+// Create category using name, parent_id, and image_url
+router.post('/',authenticateToken,authorizeRoles('Admin'), async (req, res) => {
+  const { name, parent_id, image_url } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO categories (name, parent_id)
-       VALUES ($1, $2)
+      `INSERT INTO categories (name, parent_id, image_url)
+       VALUES ($1, $2, $3)
        RETURNING *`,
-      [name, parent_id || null]
+      [name, parent_id || null, image_url || null]
     );
+
     res.status(201).json({ message: 'Category created', category: result.rows[0] });
   } catch (err) {
     console.error('Error creating category:', err);
-    res.status(500).json({ error: 'Internal server error',message: err.detail });
+    res.status(500).json({ error: 'Internal server error', message: err.detail });
   }
 });
 
+// Update category name by ID
+router.put('/:id',authenticateToken,authorizeRoles('Admin'), async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'Category name is required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE categories
+       SET name = $1
+       WHERE id = $2
+       RETURNING *`,
+      [name, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    res.status(200).json({ message: 'Category name updated', category: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating category name:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 
 // GET category (all or by id or name)
@@ -62,7 +95,15 @@ router.get('/', async (req, res) => {
 
   try {
     const result = await pool.query(query, values);
-    res.json({ categories: result.rows });
+
+    const categories = result.rows.map(cat => {
+      return {
+        ...cat,
+        image: cat.image ? `data:image/jpeg;base64,${cat.image.toString('base64')}` : null
+      };
+    });
+
+    res.json({ categories });
   } catch (err) {
     console.error('Error fetching categories:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -100,31 +141,6 @@ router.get('/v2', async (req, res) => {
     }
   });
 
-// UPDATE category
-router.put('/:id',authenticateToken , authorizeRoles('Admin'), async (req, res) => {
-  const { id } = req.params;
-  const { name, parent_id } = req.body;
-
-  try {
-    const result = await pool.query(
-      `UPDATE categories
-       SET name = $1, parent_id = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3
-       RETURNING *`,
-      [name, parent_id || null, id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-
-    res.json({ message: 'Category updated', category: result.rows[0] });
-  } catch (err) {
-    console.error('Error updating category:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // DELETE category
 router.delete('/:id',authenticateToken , authorizeRoles('Admin'), async (req, res) => {
   const { id } = req.params;
@@ -140,6 +156,52 @@ router.delete('/:id',authenticateToken , authorizeRoles('Admin'), async (req, re
   } catch (err) {
     console.error('Error deleting category:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+// PUT endpoint to upload image for a category
+router.put('/image/:category_id',authenticateToken,authorizeRoles('Admin'),uploadcatgImage.single('image'), async (req, res) => {
+  const { category_id } = req.params;
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image file uploaded' });
+  }
+
+  try {
+    // Fetch existing image path
+    const existing = await pool.query(`SELECT image_url FROM categories WHERE id = $1`, [category_id]);
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    const existingImageUrl = existing.rows[0].image_url;
+
+    // Delete the existing image file if it exists
+    if (existingImageUrl) {
+      const fullPath = path.join(__dirname, '..', '..', existingImageUrl);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    }
+
+    // Construct new image path
+    const imagePath = '/' + path.relative(path.join(__dirname, '..', '..'), req.file.path).replace(/\\/g, '/');
+
+    // Update category with new image URL
+    const result = await pool.query(
+      `UPDATE categories SET image_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [imagePath, category_id]
+    );
+
+    res.status(200).json({
+      message: 'Category image uploaded successfully',
+      category: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Failed to update category image:', err);
+    res.status(500).json({ error: 'Failed to update category image', message: err.message });
   }
 });
 

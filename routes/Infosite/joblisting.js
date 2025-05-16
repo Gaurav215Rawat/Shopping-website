@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../../config/dbconfig');
+const authenticateToken =require('../../middleware/jwt')
+const authorizeRoles = require('../../middleware/authorizeRole');
 
 // GET all job listings
 router.get('/', async (req, res) => {
@@ -15,7 +17,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST new job listing
-router.post('/', async (req, res) => {
+router.post('/',authenticateToken,authorizeRoles('Admin'), async (req, res) => {
   const { title, location, job_type, skills, experience } = req.body;
   try {
     const client = await pool.connect();
@@ -31,7 +33,7 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE a job listing by ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id',authenticateToken,authorizeRoles('Admin'), async (req, res) => {
   const { id } = req.params;
   try {
     const client = await pool.connect();

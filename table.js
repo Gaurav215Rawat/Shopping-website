@@ -43,6 +43,7 @@ const createTables = async () => {
           parent_id INT REFERENCES categories(id) ON DELETE CASCADE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          image_url TEXT ,
           CHECK (id IS DISTINCT FROM parent_id)
         );
         
@@ -55,6 +56,7 @@ const createTables = async () => {
           discount_price NUMERIC(10,2) CHECK (discount_price >= 0),
           stock INTEGER,
           specifications JSONB,
+          
           category_id INT REFERENCES categories(id) ON DELETE SET NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE (name, category_id)
@@ -91,7 +93,7 @@ const createTables = async () => {
             id SERIAL PRIMARY KEY,
             user_id INT REFERENCES   users(id) ON DELETE CASCADE,
             address_id INT REFERENCES addresses(id) ON DELETE SET NULL,
-            status VARCHAR(20) CHECK (status IN ('initiated','pending', 'paid', 'failed', 'cancelled', 'processing', 'completed', 'refunded')) DEFAULT 'pending',
+            status VARCHAR(20) CHECK (status IN ('initiated', 'processed', 'shipped', 'delivered', 'canceled', 'return')) DEFAULT 'initiated',
             total NUMERIC(10,2) NOT NULL,
             payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('phonepe', 'cod')),
             phonepe_order_id VARCHAR(255) UNIQUE,  -- PhonePe's order_id
@@ -126,9 +128,10 @@ const createTables = async () => {
           id SERIAL PRIMARY KEY,
           user_id INT REFERENCES users(id),
           product_id INT REFERENCES products(id),
-          rating INT,
+          rating NUMERIC(2,1) CHECK (rating >= 0 AND rating <= 5),
           comment TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, product_id)
         );
         
         CREATE TABLE IF NOT EXISTS coupons (
@@ -159,34 +162,35 @@ const createTables = async () => {
         );
         
         CREATE TABLE IF NOT EXISTS blogs (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        url_reference VARCHAR(255) UNIQUE,
-        summary TEXT,
-        content TEXT NOT NULL,
-        category VARCHAR(100),
-        tags TEXT[],  -- array of tags
-        author VARCHAR(100),
-        thumbnail_url TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        estimated_read_time VARCHAR(20),
-        likes INTEGER DEFAULT 0
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          url_reference VARCHAR(255) UNIQUE,
+          summary TEXT,
+          content JSONB NOT NULL,  -- updated to support structured blogContent
+          category VARCHAR(100),
+          author VARCHAR(100),
+          image_url TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          estimated_read_time VARCHAR(20),
+          likes INTEGER DEFAULT 0,
+          UNIQUE (title, category, author)
       );
 
       -- Table: blog_comments
       CREATE TABLE IF NOT EXISTS blog_comments (
         id SERIAL PRIMARY KEY,
         blog_id INTEGER REFERENCES blogs(id) ON DELETE CASCADE,
-        username VARCHAR(100) NOT NULL,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         comment TEXT NOT NULL,
-        likes INTEGER CHECK (rating BETWEEN 1 AND 5) DEFAULT 0 ,
-        posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        likes INTEGER DEFAULT 0,
+        posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (blog_id, user_id)
       );
 
       CREATE TABLE IF NOT EXISTS likes (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('blog', 'comment')),
         target_id INTEGER NOT NULL,
         liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

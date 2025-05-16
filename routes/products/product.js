@@ -173,19 +173,22 @@ router.post('/', authenticateToken, authorizeRoles('Admin'), async (req, res) =>
 
 
   // Get Product by ID
-
-// Get a product with its images
+// Get a product with its images and average rating
 router.get('/products/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;
 
-    // Get the product with its category
+    // Get the product with its category and average rating
     const productResult = await client.query(
-      `SELECT p.*, c.name AS category_name
+      `SELECT p.*, 
+              c.name AS category_name,
+              COALESCE(AVG(r.rating), 0) AS average_rating
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = $1`,
+       LEFT JOIN reviews r ON p.id = r.product_id
+       WHERE p.id = $1
+       GROUP BY p.id, c.name`,
       [id]
     );
 
@@ -197,7 +200,7 @@ router.get('/products/:id', async (req, res) => {
 
     // Get all images for the product
     const imageResult = await client.query(
-      'SELECT * FROM product_images WHERE product_id = $1',
+      'SELECT id, image_url FROM product_images WHERE product_id = $1',
       [id]
     );
 
